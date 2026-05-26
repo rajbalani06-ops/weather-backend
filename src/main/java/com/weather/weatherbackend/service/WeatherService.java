@@ -1,9 +1,11 @@
 package com.weather.weatherbackend.service;
 
-import com.weather.weatherbackend.dto.WeatherResponseDto;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import com.weather.weatherbackend.Exception.WeatherException;
+import com.weather.weatherbackend.dto.WeatherResponseDto;
 
 @Service
 public class WeatherService {
@@ -22,21 +24,29 @@ public class WeatherService {
 
         String response = restTemplate.getForObject(url, String.class);
 
+        if (response == null) {
+            throw new WeatherException("No response from weather API");
+        }
+
         JSONObject json = new JSONObject(response);
+
+        if (json.has("cod") && !json.get("cod").toString().equals("200")) {
+            String message = json.has("message") ? json.getString("message") : "City not found";
+            throw new WeatherException(message);
+        }
 
         WeatherResponseDto dto = new WeatherResponseDto();
 
-        dto.setCity(json.getString("name"));
+        dto.setCity(json.optString("name", city));
 
         dto.setTemperature(
-                json.getJSONObject("main")
-                        .getDouble("temp")
+                json.getJSONObject("main").optDouble("temp", 0.0)
         );
 
         dto.setDescription(
                 json.getJSONArray("weather")
                         .getJSONObject(0)
-                        .getString("description")
+                        .optString("description", "N/A")
         );
 
         return dto;
