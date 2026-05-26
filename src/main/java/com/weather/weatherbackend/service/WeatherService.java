@@ -14,41 +14,52 @@ public class WeatherService {
 
     public WeatherResponseDto getWeather(String city) {
 
-        String url = "https://api.openweathermap.org/data/2.5/weather?q="
-                + city
-                + "&appid="
-                + API_KEY
-                + "&units=metric";
+        try {
+            String url = "https://api.openweathermap.org/data/2.5/weather?q="
+                    + city
+                    + "&appid="
+                    + API_KEY
+                    + "&units=metric";
 
-        RestTemplate restTemplate = new RestTemplate();
+            RestTemplate restTemplate = new RestTemplate();
 
-        String response = restTemplate.getForObject(url, String.class);
+            String response = restTemplate.getForObject(url, String.class);
 
-        if (response == null) {
-            throw new WeatherException("No response from weather API");
+            if (response == null) {
+                throw new WeatherException("No response from weather API");
+            }
+
+            JSONObject json = new JSONObject(response);
+
+            String cod = String.valueOf(json.opt("cod"));
+
+            if (!cod.equals("200")) {
+                String message = json.optString("message", "City not found");
+                throw new WeatherException("OpenWeather error: " + message);
+            }
+
+            if (!json.has("main") || !json.has("weather")) {
+                throw new WeatherException("Invalid API response from OpenWeather");
+            }
+
+            WeatherResponseDto dto = new WeatherResponseDto();
+
+            dto.setCity(json.optString("name", city));
+
+            dto.setTemperature(
+                    json.getJSONObject("main").optDouble("temp", 0.0)
+            );
+
+            dto.setDescription(
+                    json.getJSONArray("weather")
+                            .getJSONObject(0)
+                            .optString("description", "N/A")
+            );
+
+            return dto;
+
+        } catch (Exception e) {
+            throw new WeatherException("Backend error: " + e.getMessage());
         }
-
-        JSONObject json = new JSONObject(response);
-
-        if (json.has("cod") && !json.get("cod").toString().equals("200")) {
-            String message = json.has("message") ? json.getString("message") : "City not found";
-            throw new WeatherException(message);
-        }
-
-        WeatherResponseDto dto = new WeatherResponseDto();
-
-        dto.setCity(json.optString("name", city));
-
-        dto.setTemperature(
-                json.getJSONObject("main").optDouble("temp", 0.0)
-        );
-
-        dto.setDescription(
-                json.getJSONArray("weather")
-                        .getJSONObject(0)
-                        .optString("description", "N/A")
-        );
-
-        return dto;
     }
 }
